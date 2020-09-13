@@ -36,11 +36,13 @@
 ;; Necessarily, powering some of these features is most easily
 ;; accomplished with a very opinionated approach to managing and using recfiles.
 
-(require 'eldoc)
-(require 'cl-lib)
-(require 'flycheck)
 
+(require 'cl-lib)
+(require 'hydra)
 (require 'rec-mode)
+(require 'flycheck)
+(require 'eldoc)
+(require 'package-lint)
 
 ;;; Code:
 
@@ -53,6 +55,12 @@
 (defcustom rec-extensions-data-file-path
   (expand-file-name "data.rec" rec-extensions-data-directory-path)
   "The path to the data file used by rec-extensions."
+  :group 'rec-extensions
+  :type 'string)
+
+(defcustom rec-extensions-schema-file-path
+  (expand-file-name "schema.rec" rec-extensions-data-directory-path)
+  "The path to the schema dump file for the rec file."
   :group 'rec-extensions
   :type 'string)
 
@@ -71,6 +79,70 @@
   (identity)
   (record)
   (position))
+
+
+;; First, what would be nice to be able to do?
+;; Schema management
+;; - Dump schema
+;; - List all records and types of records
+;;
+;; Record management
+;; - Insert record of type
+;; - pre-insert validation
+;;
+;; higher-level abstraction: workflow into workflow, or dynamic hydras
+
+
+(defun rec-extensions-dump-schema ()
+  "Read from `rec-extensions-data-file-path' and dumps the record \
+descriptors as s-expressions into `rec-extensions-schema-file-path'."
+  (interactive)
+  (call-process
+   rec-recinf ; program
+   rec-extensions-data-file-path ; infile
+   (list :file rec-extensions-schema-file-path) ; destination
+   t ; display
+					; rest args
+   "-S" ; output as sexps
+   "-d" ; show descriptors
+   )
+  (print (format "Wrote schema to %s" rec-extensions-schema-file-path)))
+
+
+
+(defhydra hydra-rec-menu (global-map "<f2>")
+"
+^Schema^             ^Unmark^           ^Actions^          ^Search
+^^^^^^^^-----------------------------------------------------------------
+_w_: write
+"
+  ("w" rec-extensions-dump-schema "write"))
+(hydra-rec-menu/body)
+
+(defun rec-extensions-schema-types ()
+  "Return a list of string, with each string representing the type (%rec) in the schema."
+  (mapcar #'(lambda (field)
+	      (field-value field))
+	  (rec-fields (rec-extensions-slurp-records))))
+(rec-extensions-schema-types)
+
+(defun rec-extensions-slurp-records ()
+  "Return a list of records, read from `rec-extensions-schema-file-path'."
+  (with-temp-buffer
+    (insert-file-contents rec-extensions-schema-file-path)
+    (let* ((schema-str (buffer-string))
+	   (sexps-as-strings (split-string schema-str "\n\n" t)))
+      (mapcar #'parse-record
+	      (mapcar #'read sexps-as-strings)))))
+
+(defun rec-field-p (field)
+  "Return t if a rec FIELD is a rec field."
+  (equal (field-rec-annotation field) "%rec"))
+
+(defun rec-fields (records)
+  "Take a list of RECORDS and return rec-annotated fields as a flat list."
+  (remove-if-not #'rec-field-p
+		 (mapflat #'record-fields records)))
 
 (defun parse-descriptors ()
   "Parse each element of `rec-buffer-descriptors'."
@@ -106,6 +178,11 @@
 (defun before-commit ()
   "Run before commit."
   (checkdoc))
+
+(defun mapflat (func sequence)
+  "Apply FUNC to SEQUENCE for each element of SEQUENCE, reducing the result to an array."
+  (cl-reduce #'append
+	     (mapcar func sequence)))
 
 (provide 'rec-extensions)
 
