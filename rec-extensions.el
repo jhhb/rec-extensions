@@ -106,7 +106,7 @@ descriptors as s-expressions into `rec-extensions-schema-file-path'."
    "-S" ; output as sexps
    "-d" ; show descriptors
    )
-  (print (format "Wrote schema to %s" rec-extensions-schema-file-path)))
+  (message (format "Wrote schema to %s" rec-extensions-schema-file-path)))
 
 
 
