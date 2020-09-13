@@ -109,22 +109,24 @@ descriptors as s-expressions into `rec-extensions-schema-file-path'."
   (message (format "Wrote schema to %s" rec-extensions-schema-file-path)))
 
 
+(defun rec-extensions-list-record-types ()
+  "Return a list of string, with each string representing the type (%rec) in the schema."
+  (interactive)
+  (message (s-join "\n" (mapcar #'(lambda (field)
+	      (field-value field))
+	  (rec-fields (rec-extensions-slurp-records))))))
 
 (defhydra hydra-rec-menu (global-map "<f2>")
 "
-^Schema^             ^Unmark^           ^Actions^          ^Search
+^Schema^             ^Records^           ^Actions^          ^Search
 ^^^^^^^^-----------------------------------------------------------------
-_w_: write
+_w_: write           _l_: list
 "
+  ("l" rec-extensions-list-record-types "list")
   ("w" rec-extensions-dump-schema "write"))
 (hydra-rec-menu/body)
 
-(defun rec-extensions-schema-types ()
-  "Return a list of string, with each string representing the type (%rec) in the schema."
-  (mapcar #'(lambda (field)
-	      (field-value field))
-	  (rec-fields (rec-extensions-slurp-records))))
-(rec-extensions-schema-types)
+
 
 (defun rec-extensions-slurp-records ()
   "Return a list of records, read from `rec-extensions-schema-file-path'."
